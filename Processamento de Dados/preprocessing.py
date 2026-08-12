@@ -11,9 +11,10 @@ A partir daqui:
     - Árvore de Decisão) carrega o .npz e treina o modelo
     - (K-Means) carrega o .npz (ou o .csv) e faz o agrupamento
 
-Requisitos: pip install scikit-learn pandas numpy
+Requisitos: python -m pip install scikit-learn pandas numpy
 """
 
+from pathlib import Path
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -21,8 +22,10 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
 # ---------------------------------------------------------
-# 1. CARREGAR OS DADOS (arquivos locais, sem necessidade de internet)
+# 1. CARREGAR OS DADOS
 # ---------------------------------------------------------
+DATA_DIR = Path(__file__).parent
+
 COLUMN_NAMES = [
     "age", "workclass", "fnlwgt", "education", "education_num",
     "marital_status", "occupation", "relationship", "race", "sex",
@@ -32,7 +35,7 @@ COLUMN_NAMES = [
 
 # adult.data: dados de treino originais, sem cabeçalho
 df_train = pd.read_csv(
-    "adult.data",
+    "./adult/adult.data",
     header=None,
     names=COLUMN_NAMES,
     sep=",",
@@ -43,7 +46,7 @@ df_train = pd.read_csv(
 # adult.test: tem uma linha de cabeçalho estranha que precisa 
 # ser pulada, e os rótulos vêm com ponto final (ex: "<=50K.")
 df_test = pd.read_csv(
-    "adult.test",
+    "./adult/adult.test",
     header=None,
     names=COLUMN_NAMES,
     sep=",",
