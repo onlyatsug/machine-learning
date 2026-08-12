@@ -2,178 +2,140 @@
 PARTE 2 — Aprendizado Não Supervisionado (K-Means)
 Adult Census Income Dataset (UCI)
 
-Pré-requisito: ter o arquivo adult_preprocessado.csv na pasta data/ (ou no mesmo diretório)
+Pré-requisito: rodar antes o passo0_preprocessing.py
+(gera adult_preprocessado.csv). Coloque este script na mesma pasta.
 
-Requisitos: pip install scikit-learn numpy pandas matplotlib seaborn
+Requisitos: pip install scikit-learn pandas numpy matplotlib
 """
 
-import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
 
 # ---------------------------------------------------------
-# 1. CARREGAR E PRÉ-PROCESSAR OS DADOS (Reutilização da Parte 1)
+# 1. CARREGAR OS DADOS PRÉ-PROCESSADOS (gerados no Passo 0)
 # ---------------------------------------------------------
-# Tenta encontrar o arquivo pré-processado nas pastas usuais
-caminho_dados = os.path.join(os.path.dirname(__file__), "adult_preprocessado.csv")
-if not os.path.exists(caminho_dados):
-    caminho_dados = "data/adult_preprocessado.csv"
-if not os.path.exists(caminho_dados):
-    caminho_dados = "adult_preprocessado.csv"
-if not os.path.exists(caminho_dados):
-    caminho_dados = "clustering/adult_preprocessado.csv"
-if not os.path.exists(caminho_dados):
-    caminho_dados = "Clustering/adult_preprocessado.csv"
-if not os.path.exists(caminho_dados):
-    caminho_dados = "../Processamento de Dados/adult_preprocessado.csv"
-if not os.path.exists(caminho_dados):
-    caminho_dados = "Processamento de Dados/adult_preprocessado.csv"
+df = pd.read_csv("adult_preprocessado.csv")
 
-df = pd.read_csv(caminho_dados)
-print(f"Dataset carregado com sucesso. Formato: {df.shape}")
+y = df["income"]                       # guardamos a classe real só para COMPARAR depois
+X = df.drop(columns=["income"])        # o K-Means NÃO recebe o rótulo
 
-# Separar ESTRITAMENTE a variável alvo (y) da matriz de atributos (X)
-# Garantia de aprendizado não supervisionado: y NUNCA entra no K-Means
-y_raw = df["income"]
-X_raw = df.drop(columns=["income"])
-
-# Converter rótulos numéricos para texto legível (se necessário)
-if y_raw.dtype in [np.int64, np.int32, int, float, np.float64]:
-    y_real = y_raw.map({0: "<=50K", 1: ">50K"})
-else:
-    y_real = y_raw.astype(str)
-
-print("Matriz X (atributos):", X_raw.shape)
-print("Distribuição real da classe alvo:")
-print(y_real.value_counts())
-
-# Padronização contínua com StandardScaler (crucial para distância euclidiana)
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X_raw)
-
+print("Shape dos dados (sem o rótulo):", X.shape)
+print("Distribuição real das classes:", y.value_counts().to_dict())
 
 # ---------------------------------------------------------
-# 2. MODELAGEM K-MEANS (k = 2)
+# 2. ESCOLHER O NÚMERO DE CLUSTERS (método do cotovelo + silhueta)
 # ---------------------------------------------------------
-# Treinamento com k=2 (duas classes de renda) e semente fixa para reprodutibilidade
-kmeans = KMeans(n_clusters=2, random_state=42, n_init=10)
-clusters = kmeans.fit_predict(X_scaled)
+# Rodamos em uma AMOSTRA para o cálculo da silhueta não ficar muito lento
+# (o dataset completo tem ~45 mil linhas e 103 colunas).
+amostra_idx = np.random.RandomState(42).choice(len(X), size=5000, replace=False)
+X_amostra = X.iloc[amostra_idx]
 
-df_resultados = pd.DataFrame({
-    "y_real": y_real,
-    "cluster": [f"Cluster {c}" for c in clusters]
-})
+inercias = []
+silhuetas = []
+k_range = range(2, 8)
 
-print("\n===== RESULTADOS DO K-MEANS =====")
-print(f"Inércia final (Soma dos erros quadráticos): {kmeans.inertia_:.2f}")
-print("Distribuição das instâncias por cluster:")
-print(df_resultados["cluster"].value_counts())
+for k in k_range:
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X_amostra)
+    inercias.append(km.inertia_)
+    silhuetas.append(silhouette_score(X_amostra, labels))
+    print(f"k={k}  inércia={km.inertia_:.1f}  silhueta={silhuetas[-1]:.4f}")
 
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+axes[0].plot(list(k_range), inercias, marker="o")
+axes[0].set_xlabel("Número de clusters (k)")
+axes[0].set_ylabel("Inércia")
+axes[0].set_title("Método do cotovelo")
+
+axes[1].plot(list(k_range), silhuetas, marker="o", color="orange")
+axes[1].set_xlabel("Número de clusters (k)")
+axes[1].set_ylabel("Coeficiente de silhueta")
+axes[1].set_title("Coeficiente de silhueta por k")
+plt.tight_layout()
+plt.savefig("kmeans_escolha_k.png", dpi=150)
+print("\nGráfico salvo: kmeans_escolha_k.png")
 
 # ---------------------------------------------------------
-# 3. TABELA COMPARATIVA (MATRIZ DE CONTINGÊNCIA)
+# 3. K-MEANS COM K=2 (comparável diretamente com o problema binário)
 # ---------------------------------------------------------
-ct_absoluta = pd.crosstab(
-    df_resultados["y_real"],
-    df_resultados["cluster"],
-    margins=True,
-    margins_name="Total"
+# Justificativa: o problema original é binário (<=50K / >50K), então
+# k=2 é a escolha mais natural para comparar clusters com classes reais.
+K_ESCOLHIDO = 2
+
+kmeans = KMeans(n_clusters=K_ESCOLHIDO, random_state=42, n_init=10)
+clusters = kmeans.fit_predict(X)
+
+print(f"\n===== K-Means com k={K_ESCOLHIDO} (dataset completo) =====")
+print("Tamanho de cada cluster:", np.bincount(clusters))
+
+# ---------------------------------------------------------
+# 4. COMPARAR CLUSTERS COM AS CLASSES REAIS (matriz de contingência)
+# ---------------------------------------------------------
+tabela_contingencia = pd.crosstab(
+    clusters, y, rownames=["Cluster"], colnames=["Classe real"]
 )
+print("\nMatriz de contingência (cluster x classe real):")
+print(tabela_contingencia)
 
-ct_pct_coluna = pd.crosstab(
-    df_resultados["y_real"],
-    df_resultados["cluster"],
-    normalize="columns"
+# Percentual de cada classe dentro de cada cluster (mais fácil de interpretar)
+tabela_percentual = pd.crosstab(
+    clusters, y, rownames=["Cluster"], colnames=["Classe real"], normalize="index"
 ) * 100
+print("\nPercentual de cada classe dentro de cada cluster:")
+print(tabela_percentual.round(1))
 
-print("\n===== MATRIZ DE CONTINGÊNCIA (ABSOLUTA) =====")
-print(ct_absoluta)
-
-print("\n===== COMPOSIÇÃO PERCENTUAL DE CADA CLUSTER (%) =====")
-print(ct_pct_coluna.round(2))
-
+tabela_contingencia.to_csv("kmeans_matriz_contingencia.csv")
+print("\nTabela salva: kmeans_matriz_contingencia.csv")
 
 # ---------------------------------------------------------
-# 4. GERAÇÃO DE GRÁFICOS (ARTEFATOS PARA O RELATÓRIO)
+# 5. MÉTRICA DE CONCORDÂNCIA (quanto os clusters se aproximam das classes)
 # ---------------------------------------------------------
-# 1) Gráfico de Dispersão PCA 2D (EXIGÊNCIA OBRIGATÓRIA DO EDITAL)
+# Como o K-Means não sabe qual número de cluster corresponde a qual classe,
+# testamos as duas correspondências possíveis e ficamos com a melhor.
+acc_opcao1 = (clusters == y.values).mean()
+acc_opcao2 = (clusters == (1 - y.values)).mean()
+concordancia = max(acc_opcao1, acc_opcao2)
+print(f"\nConcordância cluster x classe real (melhor correspondência): {concordancia:.4f}")
+
+sil_completo = silhouette_score(X_amostra, KMeans(n_clusters=2, random_state=42, n_init=10).fit_predict(X_amostra))
+print(f"Coeficiente de silhueta (k=2, amostra): {sil_completo:.4f}")
+
+# ---------------------------------------------------------
+# 6. GRÁFICO DOS CLUSTERS (redução de dimensionalidade com PCA para 2D)
+# ---------------------------------------------------------
 pca = PCA(n_components=2, random_state=42)
-X_pca = pca.fit_transform(X_scaled)
-var_exp = pca.explained_variance_ratio_
+X_pca = pca.fit_transform(X)
 
-df_pca = pd.DataFrame(X_pca, columns=["PC1", "PC2"])
-df_pca["Cluster"] = df_resultados["cluster"].values
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-plt.figure(figsize=(9, 6))
-sns.scatterplot(
-    data=df_pca,
-    x="PC1",
-    y="PC2",
-    hue="Cluster",
-    palette=["#1f77b4", "#ff7f0e"],
-    alpha=0.5,
-    s=20,
-    edgecolor=None
+# Painel 1: colorido pelos clusters encontrados pelo K-Means
+scatter1 = axes[0].scatter(
+    X_pca[:, 0], X_pca[:, 1], c=clusters, cmap="viridis", s=5, alpha=0.5
 )
-plt.title("Agrupamento K-Means (k=2) via PCA 2D", fontsize=12, fontweight="bold")
-plt.xlabel(f"Componente Principal 1 ({var_exp[0]*100:.2f}% variância)")
-plt.ylabel(f"Componente Principal 2 ({var_exp[1]*100:.2f}% variância)")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.tight_layout()
-output_dir = os.path.dirname(__file__)
-fig1_path = os.path.join(output_dir, "grafico_clusters_kmeans.png") if output_dir else "grafico_clusters_kmeans.png"
-plt.savefig(fig1_path, dpi=150)
-if output_dir and output_dir != ".":
-    plt.savefig("grafico_clusters_kmeans.png", dpi=150)
-print(f"\nGráfico salvo: {fig1_path}")
+axes[0].set_title("Clusters formados pelo K-Means")
+axes[0].set_xlabel("Componente principal 1")
+axes[0].set_ylabel("Componente principal 2")
+legend1 = axes[0].legend(*scatter1.legend_elements(), title="Cluster")
+axes[0].add_artist(legend1)
 
-# 2) Heatmap da Matriz de Contingência (OPCIONAL/RECOMENDADO)
-ct_sem_total = pd.crosstab(df_resultados["y_real"], df_resultados["cluster"])
-plt.figure(figsize=(6, 5))
-sns.heatmap(
-    ct_sem_total,
-    annot=True,
-    fmt="d",
-    cmap="Blues",
-    cbar=False,
-    linewidths=1,
-    linecolor="white",
-    annot_kws={"size": 12, "weight": "bold"}
+# Painel 2: colorido pelas classes REAIS, para comparação visual direta
+scatter2 = axes[1].scatter(
+    X_pca[:, 0], X_pca[:, 1], c=y.values, cmap="coolwarm", s=5, alpha=0.5
 )
-plt.title("Matriz de Contingência: Classe Real vs Cluster", fontsize=11, fontweight="bold")
-plt.xlabel("Cluster K-Means")
-plt.ylabel("Renda Real (income)")
+axes[1].set_title("Classes reais (<=50K vs >50K)")
+axes[1].set_xlabel("Componente principal 1")
+axes[1].set_ylabel("Componente principal 2")
+legend2 = axes[1].legend(*scatter2.legend_elements(), title="Classe")
+axes[1].add_artist(legend2)
+
 plt.tight_layout()
-fig2_path = os.path.join(output_dir, "matriz_contingencia_heatmap.png") if output_dir else "matriz_contingencia_heatmap.png"
-plt.savefig(fig2_path, dpi=150)
-if output_dir and output_dir != ".":
-    plt.savefig("matriz_contingencia_heatmap.png", dpi=150)
-print(f"Gráfico salvo: {fig2_path}")
+plt.savefig("kmeans_clusters_pca.png", dpi=150)
+print("Gráfico salvo: kmeans_clusters_pca.png")
 
+print(f"\nVariância explicada pelas 2 componentes do PCA: {pca.explained_variance_ratio_.sum()*100:.1f}%")
 
-# ---------------------------------------------------------
-# 5. ANÁLISE CRÍTICA (RESPOSTAS OBRIGATÓRIAS DO EDITAL)
-# ---------------------------------------------------------
-print("\n" + "="*60)
-print("ANÁLISE CRÍTICA PARA O RELATÓRIO TEÓRICO")
-print("="*60)
-print("""
-1. Os clusters se aproximaram das classes reais?
-   NÃO. O K-Means não conseguiu separar a renda (<=50K vs >50K). 
-   Ambos os clusters contêm uma proporção misturada das duas classes de renda.
-
-2. Por que isso aconteceu?
-   a) Maldição da Dimensionalidade: O One-Hot Encoding gerou muitas colunas 
-      esparsas, onde a distância euclidiana perde capacidade de diferenciação.
-   b) Geometria dos Dados: O K-Means busca agrupamentos esféricos lineares, 
-      enquanto a separação de renda é altamente não-linear e complexa.
-   c) Ausência do Rótulo: O algoritmo minimizou a inércia geral das variáveis 
-      demográficas e profissionais, agrupando padrões populacionais mais fortes 
-      do que o corte arbitrário da classe de renda.
-""")
-print("Concluído. Use a Matriz de Contingência e os gráficos gerados no relatório.")
+print("\n===== Concluído. Use a matriz de contingência e os gráficos no relatório. =====")
