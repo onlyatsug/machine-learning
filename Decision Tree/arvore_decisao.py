@@ -2,8 +2,7 @@
 PARTE 1 — Árvore de Decisão
 Adult Census Income Dataset (UCI)
 
-Pré-requisito: rodar antes o passo0_preprocessing.py (gera train_test_split.npz)
-Coloque este script na mesma pasta do train_test_split.npz.
+Pré-requisito: rodar antes preprocessing.py (gera train_test_split.npz)
 
 Requisitos: pip install scikit-learn numpy matplotlib
 """
@@ -106,8 +105,7 @@ print(f"Acurácia no TREINO (ajustada): {acc_treino_ajustada:.4f}")
 
 
 # ===========================================================
-# COMPARAÇÃO MANUAL DE 3 CONFIGURAÇÕES (para citar no relatório
-# como "testamos N configurações", além do GridSearch)
+# COMPARAÇÃO MANUAL DE 3 CONFIGURAÇÕES
 # ===========================================================
 configuracoes = [
     {"max_depth": None, "min_samples_leaf": 1, "criterion": "gini"},   # = baseline
@@ -126,7 +124,7 @@ for cfg in configuracoes:
 
 
 # ===========================================================
-# TABELA RESUMO (ótimo para colar direto no relatório)
+# TABELA RESUMO 
 # ===========================================================
 print("\n===== TABELA RESUMO — Antes vs Depois do ajuste =====")
 print(f"{'Modelo':40s} {'Acurácia':>10s} {'Precisão':>10s} {'Recall':>10s} {'F1':>10s}")

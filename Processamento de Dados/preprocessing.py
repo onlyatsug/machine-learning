@@ -3,16 +3,13 @@ PASSO 0 — Pré-processamento compartilhado
 Adult Census Income Dataset (UCI) — usando os arquivos originais
 adult.data + adult.test (do zip baixado em archive.ics.uci.edu)
 
-Rodem este script UMA VEZ, juntos, no início.
-Coloquem adult.data e adult.test na mesma pasta do script.
-
 Gera dois arquivos:
     - adult_preprocessado.csv   (dados prontos, já codificados e normalizados)
     - train_test_split.npz      (X_train, X_test, y_train, y_test já separados)
 
 A partir daqui:
-    - Pessoa A (Árvore de Decisão) carrega o .npz e treina o modelo
-    - Pessoa B (K-Means) carrega o .npz (ou o .csv) e faz o agrupamento
+    - Árvore de Decisão) carrega o .npz e treina o modelo
+    - (K-Means) carrega o .npz (ou o .csv) e faz o agrupamento
 
 Requisitos: pip install scikit-learn pandas numpy
 """
@@ -43,8 +40,8 @@ df_train = pd.read_csv(
     na_values="?",
 )
 
-# adult.test: tem uma linha de cabeçalho estranha ("|1x3 Cross validator")
-# que precisa ser pulada, e os rótulos vêm com ponto final (ex: "<=50K.")
+# adult.test: tem uma linha de cabeçalho estranha que precisa 
+# ser pulada, e os rótulos vêm com ponto final (ex: "<=50K.")
 df_test = pd.read_csv(
     "adult.test",
     header=None,
@@ -135,7 +132,7 @@ print("\nDistribuição da classe (treino):", np.bincount(y_train))
 print("Distribuição da classe (teste):", np.bincount(y_test))
 
 # ---------------------------------------------------------
-# 6. SALVAR ARTEFATOS PARA OS DOIS TRABALHAREM EM PARALELO
+# 6. SALVAR ARTEFATOS
 # ---------------------------------------------------------
 df_processed.to_csv("adult_preprocessado.csv", index=False)
 
@@ -147,4 +144,4 @@ np.savez(
 )
 
 print("\nArquivos gerados: adult_preprocessado.csv e train_test_split.npz")
-print("Prontos para a Pessoa A (árvore) e Pessoa B (K-Means) trabalharem em paralelo.")
+print("Prontos para a (árvore) e (K-Means)")
